@@ -1,0 +1,75 @@
+﻿groups:
+  - name: application_alerts
+    rules:
+
+      - alert: HighErrorRate
+        expr: |
+          100 * (
+            sum(rate(flask_http_request_total{status=~"5.."}[1m]))
+            /
+            sum(rate(flask_http_request_total[1m]))
+          ) > 5
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | printf \"%.2f\" }}% which exceeds 5% threshold."
+
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 1
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency detected"
+          description: "P95 latency is {{ $value | printf \"%.2f\" }}s which exceeds 1s threshold."
+
+      - alert: ApplicationDown
+        expr: up{job="application"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application is down"
+          description: "The Flask application has been unreachable for more than 30 seconds."
+
+  - name: infrastructure_alerts
+    rules:
+
+      - alert: HighCPUUsage
+        expr: |
+          100 - (
+            avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100
+          ) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | printf \"%.2f\" }}% which exceeds 80%."
+
+      - alert: HighMemoryUsage
+        expr: |
+          100 * (
+            1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+          ) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | printf \"%.2f\" }}% which exceeds 80%."
+
+      - alert: MonitoringTargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Monitoring target down"
+          description: "Target {{ $labels.job }} ({{ $labels.instance }}) is unreachable."
